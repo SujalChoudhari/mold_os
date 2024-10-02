@@ -4,35 +4,17 @@ build:
   always: true
   vars: {}
   run: 
-  - "cargo +nightly build --target x86_64-mold_os.json"
+  - "cargo bootimage"
   #  Complete command without nightly setup: cargo +nightly build -Z build-std=core,compiler_builtins --target x86_64-mold_os.json
-
-# Generated using forge add. 🔨 Thanks for using Forge. ⭐ Star on github: https://github.com/SujalChoudhari/Forge
-build_specific:
-  detect: ["src/"]
-  always: false
-  vars: {}
-  run: 
-    - win
-    - cargo rustc -- -C link-args="/ENTRY:_start /SUBSYSTEM:console"
-
-    - linux
-    - cargo rustc -- -C link-arg=-nostartfiles
-
-    - mac
-    - cargo rustc -- -C link-args="-e __start -static -nostartfiles"
 
 run:
   detect: ["src/"]
   always: true
   vars: {}
-  run: ["cargo run --target thumbv7em-none-eabihf"]
+  run: 
+  - "qemu-system-x86_64 -drive format=raw,file=.\\target\\x86_64-mold_os\\debug\\bootimage-mold_os.bin"
+  #  Complete command without nightly setup: cargo +nightly build -Z build-std=core,compiler_builtins --target x86_64-mold_os.json
 
-setup:
-  detect: ["*"]
-  always: false
-  vars: {}
-  run: ["rustup target add thumbv7em-none-eabihf"]
 
 clean:
   detect: ["*"]
