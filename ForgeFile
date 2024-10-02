@@ -1,6 +1,14 @@
-
 # Generated using forge add. 🔨 Thanks for using Forge. ⭐ Star on github: https://github.com/SujalChoudhari/Forge
 build:
+  detect: ["src/"]
+  always: true
+  vars: {}
+  run: 
+  - "cargo build --target x86_64-mold_os.json"
+  #  Complete command without nightly setup: cargo +nightly build -Z build-std=core,compiler_builtins --target x86_64-mold_os.json
+
+# Generated using forge add. 🔨 Thanks for using Forge. ⭐ Star on github: https://github.com/SujalChoudhari/Forge
+build_specific:
   detect: ["src/"]
   always: false
   vars: {}
@@ -13,15 +21,6 @@ build:
 
     - mac
     - cargo rustc -- -C link-args="-e __start -static -nostartfiles"
-
-
-# Generated using forge add. 🔨 Thanks for using Forge. ⭐ Star on github: https://github.com/SujalChoudhari/Forge
-build_thumb:
-  detect: ["src/"]
-  always: true
-  vars: {}
-  run: ["cargo build --target thumbv7em-none-eabihf"]
-
 
 run:
   detect: ["src/"]
