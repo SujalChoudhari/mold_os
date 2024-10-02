@@ -1,0 +1,23 @@
+
+# Generated using forge add. 🔨 Thanks for using Forge. ⭐ Star on github: https://github.com/SujalChoudhari/Forge
+build:
+  on: ["all"]
+  detect: ["src/"]
+  always: true
+  vars: {}
+  run: ["cargo build --target thumbv7em-none-eabihf"]
+
+run:
+  on: ["all"]
+  detect: ["src/"]
+  always: true
+  vars: {}
+  run: ["cargo run --target thumbv7em-none-eabihf"]
+
+setup:
+  on: ["all"]
+  detect: ["*"]
+  always: false
+  vars: {}
+  run: ["rustup target add thumbv7em-none-eabihf"]
+
