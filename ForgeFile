@@ -1,23 +1,38 @@
 
 # Generated using forge add. 🔨 Thanks for using Forge. ⭐ Star on github: https://github.com/SujalChoudhari/Forge
 build:
-  on: ["all"]
+  detect: ["src/"]
+  always: false
+  vars: {}
+  run: 
+    - win
+    - cargo rustc -- -C link-args="/ENTRY:_start /SUBSYSTEM:console"
+
+    - linux
+    - cargo rustc -- -C link-arg=-nostartfiles
+
+    - mac
+    - cargo rustc -- -C link-args="-e __start -static -nostartfiles"
+
+
+# Generated using forge add. 🔨 Thanks for using Forge. ⭐ Star on github: https://github.com/SujalChoudhari/Forge
+build_thumb:
   detect: ["src/"]
   always: true
   vars: {}
   run: ["cargo build --target thumbv7em-none-eabihf"]
 
+
 run:
-  on: ["all"]
   detect: ["src/"]
   always: true
   vars: {}
   run: ["cargo run --target thumbv7em-none-eabihf"]
 
 setup:
-  on: ["all"]
   detect: ["*"]
   always: false
   vars: {}
   run: ["rustup target add thumbv7em-none-eabihf"]
+
 
