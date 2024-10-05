@@ -1,5 +1,3 @@
-// in src/main.rs
-
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
@@ -7,14 +5,17 @@
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use mold_os::println;
+use mold_os::{println};
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
+    mold_os::init();
+    x86_64::instructions::interrupts::int3(); // new
 
     #[cfg(test)]
     test_main();
+    println!("It did not crash!");
 
     loop {}
 }
