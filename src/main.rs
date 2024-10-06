@@ -12,11 +12,6 @@ pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
     mold_os::init();
 
-    fn work() {
-        work();
-    }
-
-    work(); // stack over flow
 
     #[cfg(test)]
     test_main();

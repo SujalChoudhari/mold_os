@@ -14,7 +14,9 @@ pub extern "C" fn _start() -> ! {
     loop {}
 }
 
+#[allow(dead_code)]
 fn test_runner(tests: &[&dyn Fn()]) {
+    let _ = tests;
     unimplemented!();
 }
 
