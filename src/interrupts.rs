@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use pc_keyboard::{layouts, Keyboard, ScancodeSet1, HandleControl};
+use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
@@ -86,8 +86,12 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
-                pc_keyboard::DecodedKey::Unicode(character) => print!("{}", character),
-                pc_keyboard::DecodedKey::RawKey(key) => print!("{:?}", key),
+                pc_keyboard::DecodedKey::Unicode(character) => {
+                    print!("{}", character);
+                }
+                pc_keyboard::DecodedKey::RawKey(key) => {
+                    // print!("{:?}", key);
+                },
             }
         }
     }
@@ -112,5 +116,3 @@ fn test_breakpoint_exception() {
     // invoke a breakpoint exception
     x86_64::instructions::interrupts::int3();
 }
-
-

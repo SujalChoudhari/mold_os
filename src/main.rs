@@ -11,7 +11,6 @@ use mold_os::println;
 pub extern "C" fn _start() -> ! {
     mold_os::init();
 
-    
     #[cfg(test)]
     test_main();
 
