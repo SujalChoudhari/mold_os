@@ -11,7 +11,12 @@ use mold_os::println;
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
     mold_os::init();
-    x86_64::instructions::interrupts::int3(); // new
+
+    fn work() {
+        work();
+    }
+
+    work(); // stack over flow
 
     #[cfg(test)]
     test_main();
