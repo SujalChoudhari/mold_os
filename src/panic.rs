@@ -13,5 +13,6 @@ fn panic(info: &PanicInfo) -> ! {
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
+    println!("");
     mold_os::test_panic_handler(info)
 }
