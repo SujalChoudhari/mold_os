@@ -25,8 +25,9 @@ impl InterruptIndex {
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 
-pub static PICS: spin::Mutex<ChainedPics> =
-    spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+pub static PICS: Mutex<ChainedPics> =
+    Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+pub static BUFFER: Mutex<char> = Mutex::new('\0');
 
 lazy_static! {
     pub static ref IDT: InterruptDescriptorTable = {
@@ -87,11 +88,17 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
                 pc_keyboard::DecodedKey::Unicode(character) => {
-                    print!("{}", character);
+                    if BUFFER.is_locked() {
+                        unsafe {
+                            BUFFER.force_unlock();
+                        }
+                    }
+
+                    *BUFFER.lock() = character;
                 }
-                pc_keyboard::DecodedKey::RawKey(key) => {
+                pc_keyboard::DecodedKey::RawKey(_key) => {
                     // print!("{:?}", key);
-                },
+                }
             }
         }
     }

@@ -5,7 +5,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use mold_os::println;
+use mold_os::{console::get_word, println, string};
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
@@ -13,8 +13,9 @@ pub extern "C" fn _start() -> ! {
 
     #[cfg(test)]
     test_main();
+    let content: string::String = get_word();
 
-    println!("It did not crash!");
+    println!("You entered! {:?}", content);
     mold_os::hlt_loop();
 }
 
