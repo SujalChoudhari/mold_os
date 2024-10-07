@@ -4,31 +4,22 @@
 #![test_runner(mold_os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use core::panic::PanicInfo;
 use mold_os::{console::get_word, println, string};
 
+mod application;
+mod panic;
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    // Start OS
     mold_os::init();
-
+    application::start();
+    
+    // Test or/and run
     #[cfg(test)]
     test_main();
-    let content: string::String = get_word();
+    application::run();
 
-    println!("You entered! {:?}", content);
+    // Quit OS
+    application::end();
     mold_os::hlt_loop();
-}
-
-/// This function is called on panic.
-#[cfg(not(test))]
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
-    mold_os::hlt_loop();
-}
-
-#[cfg(test)]
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    mold_os::test_panic_handler(info)
 }
