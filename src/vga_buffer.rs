@@ -3,15 +3,32 @@ use volatile::Volatile;
 
 #[macro_export]
 macro_rules! log {
-    () => ($crate::print!("[INFO]\n")); // No arguments, just [INFO]
-    ($($arg:tt)*) => ($crate::print!("[INFO] {}\n", format_args!($($arg)*))); // With arguments
+    () => {{
+        $crate::setcolor!($crate::vga_buffer::Color::Cyan, $crate::vga_buffer::Color::Black); // Set color to cyan
+        $crate::print!("[INFO]\n");
+        $crate::_reset_color(); // Reset color after logging
+    }};
+    ($($arg:tt)*) => {{
+        $crate::setcolor!($crate::vga_buffer::Color::Cyan, $crate::vga_buffer::Color::Black); // Set color to cyan
+        $crate::print!("[INFO] {}\n", format_args!($($arg)*));
+        $crate::vga_buffer::_reset_color(); // Reset color after logging
+    }};
 }
 
 #[macro_export]
 macro_rules! warn {
-    () => ($crate::print!("[WARN]\n")); // No arguments, just [WARN]
-    ($($arg:tt)*) => ($crate::print!("[WARN] {}\n", format_args!($($arg)*))); // With arguments
+    () => {{
+        $crate::setcolor!($crate::vga_buffer::Color::Yellow, $crate::vga_buffer::Color::Black); // Set color to yellow
+        $crate::print!("[WARN]\n");
+        $crate::_reset_color(); // Reset color after warning
+    }};
+    ($($arg:tt)*) => {{
+        $crate::setcolor!($crate::vga_buffer::Color::Yellow, $crate::vga_buffer::Color::Black); // Set color to yellow
+        $crate::print!("[WARN] {}\n", format_args!($($arg)*));
+        $crate::vga_buffer::_reset_color(); // Reset color after warning
+    }};
 }
+
 
 #[macro_export]
 macro_rules! print {
@@ -31,6 +48,19 @@ macro_rules! clrscr {
     };
 }
 
+#[macro_export]
+macro_rules! setcolor {
+    ($fg:expr, $bg:expr) => {
+        $crate::vga_buffer::_setcolor($fg, $bg); // Call the _setcolor function
+    };
+}
+
+#[macro_export]
+macro_rules! resetcolor {
+    () => {
+        $crate::vga_buffer::_reset_color(); // Call the _setcolor function
+    };
+}
 
 /// Prints the given formatted string to the VGA text buffer
 /// through the global `WRITER` instance.
@@ -50,6 +80,17 @@ pub fn _clrscr() {
     let mut writer = WRITER.lock();
     writer.clear();
 }
+
+pub fn _setcolor(fg: Color, bg: Color) {
+    let color_code: ColorCode = ColorCode::new(fg, bg);
+    WRITER.lock().color_code = color_code; // Set the color code in the locked writer
+}
+
+pub fn _reset_color() {
+    let color_code: ColorCode = ColorCode::new(Color::White, Color::Black);
+    WRITER.lock().color_code = color_code; // Reset to white on black
+}
+
 
 
 #[allow(dead_code)]
