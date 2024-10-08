@@ -6,6 +6,8 @@ use x86_64::structures::tss::TaskStateSegment;
 
 use x86_64::VirtAddr;
 
+use crate::log;
+
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
 lazy_static! {
@@ -44,9 +46,11 @@ lazy_static! {
 }
 
 pub fn init() {
+    log!("Initiating GDT");
     use x86_64::instructions::segmentation::{Segment, CS};
     use x86_64::instructions::tables::load_tss;
 
+    log!("Loading GDT");
     GDT.0.load();
     unsafe {
         CS::set_reg(GDT.1.code_selector);

@@ -36,6 +36,36 @@ impl String {
         }
     }
 
+    pub fn pop(&mut self) -> Option<char> {
+        if self.len == 0 {
+            return None; // Return None if the string is empty
+        }
+
+        // Find the start of the last UTF-8 character
+        let mut char_start = self.len;
+
+        // UTF-8 uses continuation bytes (leading bits `10xxxxxx`), so we find the first byte
+        // of the last character by looking for a byte that doesn't start with `10`.
+        while char_start > 0 {
+            char_start -= 1;
+            if (self.buffer[char_start] & 0b1100_0000) != 0b1000_0000 {
+                break;
+            }
+        }
+
+        // Decode the last character from the found position
+        let last_char = core::str::from_utf8(&self.buffer[char_start..self.len])
+            .ok()?
+            .chars()
+            .next()?;
+
+        // Update the length to exclude the last character
+        self.len = char_start;
+
+        // Return the removed character
+        Some(last_char)
+    }
+
     /// Append a string slice to the string
     pub fn push_str(&mut self, s: &str) {
         for ch in s.chars() {

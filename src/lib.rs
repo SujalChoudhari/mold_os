@@ -67,7 +67,10 @@ pub enum QemuExitCode {
 pub fn init() {
     interrupts::init_idt();
     gdt::init();
+
+    log!("Initiating PICS");
     unsafe { interrupts::PICS.lock().initialize() };
+    log!("Enabling Interupts");
     x86_64::instructions::interrupts::enable();
 }
 

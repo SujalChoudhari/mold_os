@@ -18,7 +18,7 @@ fn get_from_stdin_with_delimiters(delimiters: &[char]) -> String {
                 // wait
             }
             // Lock the buffer
-            if *BUFFER.lock() != '\0' {
+            if *BUFFER.lock() != '\0'  {
                 let buffer = BUFFER.lock();
                 print!("{}", *buffer);
                 buffer_content = *buffer;
@@ -27,6 +27,14 @@ fn get_from_stdin_with_delimiters(delimiters: &[char]) -> String {
             }
             clear_buffer();
         } // Unlock buffer
+
+        if buffer_content == '\x08' {
+            if !output.is_empty() {
+                // Remove the last character from output string
+                output.pop();
+            }
+            continue;  // Continue to the next iteration without processing further
+        }
 
         // Break the loop if the buffer content matches any delimiter
         if delimiters.contains(&buffer_content) {

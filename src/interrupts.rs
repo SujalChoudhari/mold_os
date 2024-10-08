@@ -4,6 +4,7 @@ use spin::Mutex;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 use crate::gdt;
+use crate::log;
 use crate::print;
 use crate::println;
 use pic8259::ChainedPics;
@@ -56,6 +57,7 @@ lazy_static! {
 }
 
 pub fn init_idt() {
+    log!("Initiating IDT");
     IDT.load();
 }
 
