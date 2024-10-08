@@ -2,6 +2,18 @@ use core::fmt;
 use volatile::Volatile;
 
 #[macro_export]
+macro_rules! log {
+    () => ($crate::print!("[INFO]\n")); // No arguments, just [INFO]
+    ($($arg:tt)*) => ($crate::print!("[INFO] {}\n", format_args!($($arg)*))); // With arguments
+}
+
+#[macro_export]
+macro_rules! warn {
+    () => ($crate::print!("[WARN]\n")); // No arguments, just [WARN]
+    ($($arg:tt)*) => ($crate::print!("[WARN] {}\n", format_args!($($arg)*))); // With arguments
+}
+
+#[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
 }
@@ -12,17 +24,33 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
+#[macro_export]
+macro_rules! clrscr {
+    () => {
+        $crate::vga_buffer::_clrscr(); // Call the _clrscr function to clear the screen
+    };
+}
+
+
 /// Prints the given formatted string to the VGA text buffer
 /// through the global `WRITER` instance.
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
-    use x86_64::instructions::interrupts;   
+    use x86_64::instructions::interrupts;
 
-    interrupts::without_interrupts(|| {     
+    interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
     });
 }
+
+#[doc(hidden)]
+pub fn _clrscr() {
+    // Lock the writer and call the clear method
+    let mut writer = WRITER.lock();
+    writer.clear();
+}
+
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,7 +116,25 @@ impl fmt::Write for Writer {
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            b'\n' => self.new_line(),
+            b'\n' => self.new_line(), // Handle Newline
+            b'\x08' => {
+                // Handle backspace
+                if self.column_position > 0 {
+                    // Move the cursor one position to the left
+                    self.column_position -= 1;
+
+                    // Clear the character at the new cursor position
+                    let row = BUFFER_HEIGHT - 1;
+                    let col = self.column_position;
+                    let color_code = self.color_code;
+
+                    // Replace the character with a space
+                    self.buffer.chars[row][col].write(ScreenChar {
+                        ascii_character: b' ', // Clear with space
+                        color_code,
+                    });
+                }
+            }
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
@@ -128,14 +174,23 @@ impl Writer {
         }
     }
 
+    pub fn clear(&mut self) {
+        for row in 0..BUFFER_HEIGHT {
+            self.clear_row(row); // Clear each row
+        }
+        self.column_position = 0; // Reset column position to 0 after clearing
+    }
+
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
                 // printable ASCII byte or newline
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                0x20..=0x7e => self.write_byte(byte),
+                b'\n' => self.write_byte(byte),
+                b'\x08' => self.write_byte(byte),
                 // not part of printable ASCII range
                 _ => {
-                    self.write_byte(b'#');
+                    self.write_byte(b'@');
                 }
             }
         }
@@ -144,6 +199,8 @@ impl Writer {
 
 use lazy_static::lazy_static;
 use spin::Mutex;
+
+use crate::serial_print;
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
