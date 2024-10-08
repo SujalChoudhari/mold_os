@@ -1,8 +1,14 @@
-use mold_os::{clrscr, console::{get_line, get_word}, print, println, resetcolor, setcolor, warn};
+use mold_os::{
+    clrscr,
+    console::{get_line, get_word},
+    print, println, resetcolor, setcolor, warn,
+};
 
 pub fn start() {
     clrscr!();
     println!("Welcome to Mold OS!");
+
+
 }
 
 pub fn run() {
@@ -10,7 +16,10 @@ pub fn run() {
         print!(">> ");
         let command = get_line();
 
-        setcolor!(mold_os::vga_buffer::Color::DarkGray,mold_os::vga_buffer::Color::LightGreen);
+        setcolor!(
+            mold_os::vga_buffer::Color::DarkGray,
+            mold_os::vga_buffer::Color::LightGreen
+        );
         print!("{}", command);
         resetcolor!();
         println!();

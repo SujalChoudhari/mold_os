@@ -12,6 +12,7 @@ pub mod serial;
 pub mod vga_buffer;
 pub mod console;
 pub mod string;
+pub mod memory;
 pub trait Testable {
     fn run(&self) -> ();
 }
