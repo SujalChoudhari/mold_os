@@ -29,7 +29,6 @@ macro_rules! warn {
     }};
 }
 
-
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -90,8 +89,6 @@ pub fn _reset_color() {
     let color_code: ColorCode = ColorCode::new(Color::White, Color::Black);
     WRITER.lock().color_code = color_code; // Reset to white on black
 }
-
-
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -235,6 +232,68 @@ impl Writer {
                 }
             }
         }
+    }
+
+    pub fn write_at(&mut self, row: usize, col: usize, character: u8) {
+        if row < BUFFER_HEIGHT && col < BUFFER_WIDTH {
+            let color_code = self.color_code;
+            self.buffer.chars[row][col].write(ScreenChar {
+                ascii_character: character,
+                color_code,
+            });
+        }
+    }
+
+    /// Write a string at a specific position
+    pub fn write_string_at(&mut self, row: usize, col: usize, s: &str) {
+        let mut current_col = col;
+        for byte in s.bytes() {
+            if current_col >= BUFFER_WIDTH {
+                break; // Avoid overflowing to the next line
+            }
+            self.write_at(row, current_col, byte);
+            current_col += 1;
+        }
+    }
+
+    /// Draw a horizontal line from (start_col, row) to (end_col, row)
+    pub fn draw_horizontal_line(&mut self, row: usize, start_col: usize, end_col: usize) {
+        if row >= BUFFER_HEIGHT {
+            return;
+        }
+        let start = start_col.min(BUFFER_WIDTH);
+        let end = end_col.min(BUFFER_WIDTH);
+
+        for col in start..end {
+            self.write_at(row, col, b'-'); // Use '-' for horizontal line
+        }
+    }
+
+    /// Draw a vertical line from (col, start_row) to (col, end_row)
+    pub fn draw_vertical_line(&mut self, col: usize, start_row: usize, end_row: usize) {
+        if col >= BUFFER_WIDTH {
+            return;
+        }
+        let start = start_row.min(BUFFER_HEIGHT);
+        let end = end_row.min(BUFFER_HEIGHT);
+
+        for row in start..end {
+            self.write_at(row, col, b'|'); // Use '|' for vertical line
+        }
+    }
+
+    /// Draw a rectangle (box) from (start_row, start_col) to (end_row, end_col)
+    pub fn draw_box(&mut self, start_row: usize, start_col: usize, end_row: usize, end_col: usize) {
+        self.draw_horizontal_line(start_row, start_col, end_col); // Top edge
+        self.draw_horizontal_line(end_row, start_col, end_col); // Bottom edge
+        self.draw_vertical_line(start_col, start_row, end_row); // Left edge
+        self.draw_vertical_line(end_col, start_row, end_row); // Right edge
+
+        // Draw corners
+        self.write_at(start_row, start_col, b'+'); // Top-left corner
+        self.write_at(start_row, end_col, b'+'); // Top-right corner
+        self.write_at(end_row, start_col, b'+'); // Bottom-left corner
+        self.write_at(end_row, end_col, b'+'); // Bottom-right corner
     }
 }
 

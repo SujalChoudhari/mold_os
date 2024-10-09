@@ -8,7 +8,6 @@ extern crate alloc;
 use alloc::{boxed::Box, vec, vec::Vec, rc::Rc};
 use bootloader::{entry_point, BootInfo};
 use mold_os::{memory::translate_addr, println};
-
 mod application;
 mod panic;
 
@@ -46,7 +45,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("reference count is {} now", Rc::strong_count(&cloned_reference));
 
 
-    
+
     // Test or/and run
     #[cfg(test)]
     test_main();
