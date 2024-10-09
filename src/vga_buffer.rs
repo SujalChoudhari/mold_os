@@ -90,6 +90,48 @@ pub fn _reset_color() {
     WRITER.lock().color_code = color_code; // Reset to white on black
 }
 
+// Drawing functions that will be exposed for use
+pub fn write_text_at(row: usize, col: usize, text: &str) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.write_string_at(row, col, text);
+    });
+}
+
+pub fn draw_horizontal_line(row: usize, start_col: usize, end_col: usize) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.draw_horizontal_line(row, start_col, end_col);
+    });
+}
+
+pub fn draw_vertical_line(col: usize, start_row: usize, end_row: usize) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.draw_vertical_line(col, start_row, end_row);
+    });
+}
+
+pub fn draw_box(start_row: usize, start_col: usize, end_row: usize, end_col: usize) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.draw_box(start_row, start_col, end_row, end_col);
+    });
+}
+
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.clear();
+    });
+}
+
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
