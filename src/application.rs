@@ -5,30 +5,51 @@ use mold_os::{clrscr, console::get_char, print, println};
 use x86_64::VirtAddr;
 
 // Constants for the maze
-const MAZE_WIDTH: usize = 79; // Updated width
-const MAZE_HEIGHT: usize = 24; // Updated height
+const MAZE_WIDTH: usize = 79;
+const MAZE_HEIGHT: usize = 24;
 
 const PLAYER_CHAR: char = '@';
 const WALL_CHAR: char = '#';
-const EXPLORED_CHAR: char = ' '; // Visible explored area
-const UNEXPLORED_CHAR: char = '?'; // Fog
+const EXPLORED_CHAR: char = ' ';
+const UNEXPLORED_CHAR: char = '?';
 const CHEST_CHAR: char = '$';
 const MONSTER_CHAR: char = 'M';
 const EXIT_CHAR: char = 'V';
 
 // Structure to hold game state
 struct GameState {
-    player_x: usize,
-    player_y: usize,
+    player: Player,
     maze: [[char; MAZE_WIDTH]; MAZE_HEIGHT],
+    level: usize,
+}
+
+struct Player {
+    x: usize,
+    y: usize,
+    health: i32,
+    max_health: i32,
+    xp: i32,
+    sword_level: i32,
+}
+
+struct Monster {
+    health: i32,
+    xp_reward: i32,
 }
 
 impl GameState {
     fn new() -> Self {
         GameState {
-            player_x: 1,
-            player_y: 1,
-            maze: initialize_maze(1), // Start level set to 1
+            player: Player {
+                x: 1,
+                y: 1,
+                health: 100,
+                max_health: 100,
+                xp: 0,
+                sword_level: 1,
+            },
+            maze: initialize_maze(1),
+            level: 1,
         }
     }
 }
@@ -54,38 +75,221 @@ impl Rng {
 }
 
 fn initialize_maze(level: usize) -> [[char; MAZE_WIDTH]; MAZE_HEIGHT] {
-    // Initialize the maze with walls around the edges
     let mut maze: [[char; MAZE_WIDTH]; MAZE_HEIGHT] = [['#'; MAZE_WIDTH]; MAZE_HEIGHT];
 
-    // Fill the inner maze area with unexplored spaces
     for row in 1..MAZE_HEIGHT - 1 {
         for col in 1..MAZE_WIDTH - 1 {
             maze[row][col] = UNEXPLORED_CHAR;
         }
     }
 
-    // Randomly place chests, monsters, and exit using modular arithmetic
-    let mut rng = Rng::new(level as u32); // Use the level number as the seed
+    let mut rng = Rng::new(level as u32);
 
-    // Place a chest at a random position
-    let chest_x = 1 + (rng.next_range((MAZE_WIDTH - 2) as u32) / 2) * 2;
-    let chest_y = 1 + (rng.next_range((MAZE_HEIGHT - 2) as u32) / 2) * 2;
-    maze[chest_y][chest_x] = CHEST_CHAR;
+    // Place chests
+    for _ in 0..level {
+        let chest_x = 1 + (rng.next_range((MAZE_WIDTH - 2) as u32) / 2) * 2;
+        let chest_y = 1 + (rng.next_range((MAZE_HEIGHT - 2) as u32) / 2) * 2;
+        maze[chest_y][chest_x] = CHEST_CHAR;
+    }
 
-    // Place a monster at a random position
-    let monster_x = 1 + (rng.next_range((MAZE_WIDTH - 2) as u32) / 2) * 2;
-    let monster_y = 1 + (rng.next_range((MAZE_HEIGHT - 2) as u32) / 2) * 2;
-    maze[monster_y][monster_x] = MONSTER_CHAR;
+    // Place monsters
+    for _ in 0..level * 2 {
+        let monster_x = 1 + (rng.next_range((MAZE_WIDTH - 2) as u32) / 2) * 2;
+        let monster_y = 1 + (rng.next_range((MAZE_HEIGHT - 2) as u32) / 2) * 2;
+        maze[monster_y][monster_x] = MONSTER_CHAR;
+    }
 
-    // Place the exit at a random position
+    // Place the exit
     let exit_x = 1 + (rng.next_range((MAZE_WIDTH - 2) as u32) / 2) * 2;
     let exit_y = 1 + (rng.next_range((MAZE_HEIGHT - 2) as u32) / 2) * 2;
     maze[exit_y][exit_x] = EXIT_CHAR;
 
-    // Set the player's starting position
-    maze[1][1] = PLAYER_CHAR; // Set player at starting position
+    maze[1][1] = PLAYER_CHAR;
 
     maze
+}
+
+pub fn run() {
+    let mut game_state = GameState::new();
+
+    loop {
+        clear_and_draw_maze(&mut game_state);
+        draw_player_stats(&game_state);
+        handle_player_input(&mut game_state);
+    }
+}
+
+fn clear_and_draw_maze(game_state: &mut GameState) {
+    clrscr!();
+    for row in 0..MAZE_HEIGHT {
+        for col in 0..MAZE_WIDTH {
+            let ch = if row == game_state.player.y && col == game_state.player.x {
+                PLAYER_CHAR
+            } else if is_within_view(row, col, game_state.player.x, game_state.player.y) {
+                game_state.maze[row][col]
+            } else {
+                UNEXPLORED_CHAR
+            };
+            write_text_at(row, col, &ch.to_string());
+        }
+    }
+}
+
+fn draw_player_stats(game_state: &GameState) {
+    let stats = format!(
+        "Health: {}/{} | XP: {} | Sword Level: {} | Level: {}",
+        game_state.player.health,
+        game_state.player.max_health,
+        game_state.player.xp,
+        game_state.player.sword_level,
+        game_state.level
+    );
+    write_text_at(MAZE_HEIGHT, 0, &stats);
+}
+
+fn is_within_view(row: usize, col: usize, player_x: usize, player_y: usize) -> bool {
+    let dx = (col as isize - player_x as isize).abs();
+    let dy = (row as isize - player_y as isize).abs();
+    dx <= 2 && dy <= 2
+}
+
+fn handle_player_input(game_state: &mut GameState) {
+    let input = get_char();
+
+    let (new_x, new_y) = match input {
+        'w' => (game_state.player.x, game_state.player.y.saturating_sub(1)),
+        's' => (game_state.player.x, game_state.player.y + 1),
+        'a' => (game_state.player.x.saturating_sub(1), game_state.player.y),
+        'd' => (game_state.player.x + 1, game_state.player.y),
+        ' ' => {
+            if let Some(entity) =
+                get_entity_at(game_state, game_state.player.x, game_state.player.y)
+            {
+                handle_interaction(game_state, entity);
+            }
+            (game_state.player.x, game_state.player.y)
+        }
+        _ => (game_state.player.x, game_state.player.y),
+    };
+
+    if game_state.maze[new_y][new_x] != WALL_CHAR {
+        game_state.player.x = new_x;
+        game_state.player.y = new_y;
+        reveal_area(game_state, new_x, new_y);
+    }
+}
+
+fn get_entity_at(game_state: &GameState, x: usize, y: usize) -> Option<char> {
+    match game_state.maze[y][x] {
+        CHEST_CHAR => Some(CHEST_CHAR),
+        MONSTER_CHAR => Some(MONSTER_CHAR),
+        EXIT_CHAR => Some(EXIT_CHAR),
+        _ => None,
+    }
+}
+
+fn handle_interaction(game_state: &mut GameState, entity: char) {
+    match entity {
+        CHEST_CHAR => open_chest(game_state),
+        MONSTER_CHAR => fight_monster(game_state),
+        EXIT_CHAR => next_level(game_state),
+        _ => {}
+    }
+}
+
+fn open_chest(game_state: &mut GameState) {
+    let mut rng = Rng::new(game_state.level as u32);
+    let health_gain = rng.next_range(20) as i32 + 10;
+    let xp_gain = rng.next_range(30) as i32 + 20;
+
+    game_state.player.health =
+        (game_state.player.health + health_gain).min(game_state.player.max_health);
+    game_state.player.xp += xp_gain;
+
+    println!(
+        "You found a chest! Gained {} health and {} XP.",
+        health_gain, xp_gain
+    );
+    game_state.maze[game_state.player.y][game_state.player.x] = EXPLORED_CHAR;
+}
+
+fn fight_monster(game_state: &mut GameState) {
+    let mut monster = Monster {
+        health: game_state.level as i32 * 20 + 10,
+        xp_reward: game_state.level as i32 * 15 + 5,
+    };
+
+    println!("You encountered a monster! Fight begins!");
+
+    loop {
+        // Player's turn
+        let player_damage = game_state.player.sword_level * 5 + 5;
+        monster.health -= player_damage;
+        println!("You dealt {} damage to the monster!", player_damage);
+
+        if monster.health <= 0 {
+            println!("You defeated the monster! Gained {} XP.", monster.xp_reward);
+            game_state.player.xp += monster.xp_reward;
+            game_state.maze[game_state.player.y][game_state.player.x] = EXPLORED_CHAR;
+            break;
+        }
+
+        // Monster's turn
+        let monster_damage = game_state.level * 2 + 5;
+        game_state.player.health -= monster_damage as i32;
+        println!("The monster dealt {} damage to you!", monster_damage);
+
+        if game_state.player.health <= 0 {
+            println!("Game Over! You were defeated by the monster.");
+            // Handle game over logic here
+            break;
+        }
+    }
+}
+
+fn next_level(game_state: &mut GameState) {
+    game_state.level += 1;
+    game_state.maze = initialize_maze(game_state.level);
+    game_state.player.x = 1;
+    game_state.player.y = 1;
+    game_state.player.health = game_state.player.max_health;
+
+    println!(
+        "You reached the exit! Moving to level {}.",
+        game_state.level
+    );
+    println!("Would you like to upgrade your sword? (y/n)");
+
+    loop {
+        let input = get_char();
+        match input {
+            'y' => {
+                if game_state.player.xp >= 100 {
+                    game_state.player.sword_level += 1;
+                    game_state.player.xp -= 100;
+                    println!("Sword upgraded to level {}!", game_state.player.sword_level);
+                } else {
+                    println!("Not enough XP to upgrade sword.");
+                }
+                break;
+            }
+            'n' => {
+                println!("Sword not upgraded.");
+                break;
+            }
+            _ => println!("Invalid input. Please enter 'y' or 'n'."),
+        }
+    }
+}
+
+fn reveal_area(game_state: &mut GameState, new_x: usize, new_y: usize) {
+    for row in new_y.saturating_sub(2)..=(new_y + 2).min(MAZE_HEIGHT - 1) {
+        for col in new_x.saturating_sub(2)..=(new_x + 2).min(MAZE_WIDTH - 1) {
+            if game_state.maze[row][col] == UNEXPLORED_CHAR {
+                game_state.maze[row][col] = EXPLORED_CHAR;
+            }
+        }
+    }
 }
 
 pub fn start(boot_info: &'static BootInfo) {
@@ -100,186 +304,11 @@ pub fn start(boot_info: &'static BootInfo) {
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
     clrscr!();
-    println!("Welcome to Mold OS!");
-}
-
-pub fn run() {
-    let mut game_state = GameState::new();
-
-    loop {
-        clear_and_draw_maze(&mut game_state);
-        handle_player_input(&mut game_state);
-    }
-}
-
-fn clear_and_draw_maze(game_state: &mut GameState) {
-    clrscr!();
-    for row in 0..MAZE_HEIGHT {
-        for col in 0..MAZE_WIDTH {
-            let ch = if row == game_state.player_y && col == game_state.player_x {
-                PLAYER_CHAR // Draw player character
-            } else if is_within_view(row, col, game_state.player_x, game_state.player_y) {
-                game_state.maze[row][col] // Reveal adjacent cells
-            } else {
-                UNEXPLORED_CHAR // Fog of war
-            };
-            write_text_at(row, col, &ch.to_string());
-        }
-    }
-}
-
-// Function to check if a cell is within the view distance of the player
-fn is_within_view(row: usize, col: usize, player_x: usize, player_y: usize) -> bool {
-    let dx = (col as isize - player_x as isize).abs();
-    let dy = (row as isize - player_y as isize).abs();
-    dx <= 2 && dy <= 2 // Check if within two cells in both directions
-}
-
-fn handle_player_input(game_state: &mut GameState) {
-    // Get the character input for movement
-    let input = get_char();
-
-    // Calculate new player position based on input
-    let (new_x, new_y) = match input {
-        'w' => (game_state.player_x, game_state.player_y.saturating_sub(1)), // Move up
-        's' => (game_state.player_x, game_state.player_y + 1),               // Move down
-        'a' => (game_state.player_x.saturating_sub(1), game_state.player_y), // Move left
-        'd' => (game_state.player_x + 1, game_state.player_y),               // Move right
-        ' ' => {
-            // Check if player is on an entity and open the menu
-            if let Some(entity) =
-                get_entity_at(game_state, game_state.player_x, game_state.player_y)
-            {
-                open_interaction_menu(entity);
-            }
-            (game_state.player_x, game_state.player_y) // No movement
-        }
-        _ => (game_state.player_x, game_state.player_y), // No movement
-    };
-
-    // Check for walls and update player position if it's valid
-    if game_state.maze[new_y][new_x] != WALL_CHAR {
-        game_state.player_x = new_x;
-        game_state.player_y = new_y;
-
-        // Reveal the area around the player when they move
-        reveal_area(game_state, new_x, new_y);
-    }
-}
-
-// Function to get the entity at the given position
-fn get_entity_at(game_state: &GameState, x: usize, y: usize) -> Option<char> {
-    match game_state.maze[y][x] {
-        CHEST_CHAR => Some(CHEST_CHAR),
-        MONSTER_CHAR => Some(MONSTER_CHAR),
-        EXIT_CHAR => Some(EXIT_CHAR),
-        _ => None,
-    }
-}
-
-fn open_interaction_menu(entity: char) {
-    clrscr!();
-
-    let actions: [&'static str; 3] = match entity {
-        CHEST_CHAR => ["Open Chest", "Leave", "Inspect"],
-        MONSTER_CHAR => ["Attack", "Flee", "Inspect"],
-        EXIT_CHAR => ["Enter", "Leave", "Inspect"],
-        _ => ["Leave", "Inspect", "Done"],
-    };
-
-    // Display menu
-    let menu_height = actions.len() + 2; // Add 2 for title and border
-    let start_row = (MAZE_HEIGHT - menu_height) / 2;
-    let start_col = (MAZE_WIDTH - 20) / 2;
-
-    draw_box(
-        start_row,
-        start_col,
-        start_row + menu_height,
-        start_col + 19,
-    );
-    write_text_at(start_row + 1, start_col + 1, "Select an action:");
-
-    // Initial draw of the actions without selection indicator
-    for (i, &action) in actions.iter().enumerate() {
-        write_text_at(start_row + 2 + i, start_col + 1, action);
-    }
-
-    // Handle input to select an action
-    let selection = get_menu_selection(&actions, actions.len(), start_row, start_col);
-    handle_menu_selection(selection, entity);
-}
-
-fn get_menu_selection(
-    actions: &[&'static str],
-    num_actions: usize,
-    start_row: usize,
-    start_col: usize,
-) -> usize {
-    let mut selection = 0; // Start with the first action
-    loop {
-        // Highlight selected option and redraw all actions
-        for i in 0..num_actions {
-            let action = if i == selection {
-                format!(">> {} <<", actions[i]) // Highlight selected option
-            } else {
-                format!("   {}   ", actions[i]) // Clear indicator for others
-            };
-            write_text_at(start_row + 2 + i, start_col + 1, &action);
-        }
-
-        // Get user input for menu navigation
-        let input = get_char();
-        match input {
-            'w' => selection = selection.saturating_sub(1), // Move up
-            's' => selection = (selection + 1).min(num_actions - 1), // Move down
-            ' ' => break,                                   // Select action
-            _ => {}
-        }
-
-        // Ensure selection wraps around
-        if selection >= num_actions {
-            selection = num_actions - 1;
-        }
-    }
-    selection
-}
-
-fn handle_menu_selection(selection: usize, entity: char) {
-    match entity {
-        CHEST_CHAR => match selection {
-            0 => println!("You opened the chest!"),
-            1 => println!("You left the chest."),
-            2 => println!("You inspected the chest."),
-            _ => {}
-        },
-        MONSTER_CHAR => match selection {
-            0 => println!("You attacked the monster!"),
-            1 => println!("You fled from the monster."),
-            2 => println!("You inspected the monster."),
-            _ => {}
-        },
-        EXIT_CHAR => match selection {
-            0 => println!("You entered the exit!"),
-            1 => println!("You left the exit."),
-            2 => println!("You inspected the exit."),
-            _ => {}
-        },
-        _ => {}
-    }
-}
-
-fn reveal_area(game_state: &mut GameState, new_x: usize, new_y: usize) {
-    // Reveal cells in a 2-cell radius around the player
-    for row in new_y.saturating_sub(2)..=(new_y + 2).min(MAZE_HEIGHT - 1) {
-        for col in new_x.saturating_sub(2)..=(new_x + 2).min(MAZE_WIDTH - 1) {
-            if game_state.maze[row][col] == UNEXPLORED_CHAR {
-                game_state.maze[row][col] = EXPLORED_CHAR; // Set the cell to explored
-            }
-        }
-    }
+    println!("Welcome to Mold OS Maze Game!");
 }
 
 pub fn end() {
-    println!("Quitting OS!");
+    println!("Thanks for playing Mold OS Maze Game!");
 }
+
+
