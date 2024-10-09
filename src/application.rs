@@ -1,7 +1,10 @@
 use crate::vga_buffer::{clear_screen, draw_box, write_text_at};
-use alloc::{format, string::ToString};
+use alloc::{
+    format,
+    string::{String, ToString},
+};
 use bootloader::BootInfo;
-use mold_os::{clrscr, console::get_char, print, println};
+use mold_os::{clrscr, console::get_char, print, println, setcolor};
 use x86_64::VirtAddr;
 
 // Constants for the maze
@@ -15,6 +18,10 @@ const UNEXPLORED_CHAR: char = '?';
 const CHEST_CHAR: char = '$';
 const MONSTER_CHAR: char = 'M';
 const EXIT_CHAR: char = 'V';
+
+const FOG_NEAR: char = '.';
+const FOG_MID: char = ',';
+const FOG_FAR: char = '*';
 
 // Structure to hold game state
 struct GameState {
@@ -125,13 +132,41 @@ fn clear_and_draw_maze(game_state: &mut GameState) {
         for col in 0..MAZE_WIDTH {
             let ch = if row == game_state.player.y && col == game_state.player.x {
                 PLAYER_CHAR
-            } else if is_within_view(row, col, game_state.player.x, game_state.player.y) {
-                game_state.maze[row][col]
             } else {
-                UNEXPLORED_CHAR
+                get_fog_char(
+                    row,
+                    col,
+                    game_state.player.x,
+                    game_state.player.y,
+                    &game_state.maze,
+                )
             };
             write_text_at(row, col, &ch.to_string());
         }
+    }
+}
+
+fn get_fog_char(
+    row: usize,
+    col: usize,
+    player_x: usize,
+    player_y: usize,
+    maze: &[[char; MAZE_WIDTH]; MAZE_HEIGHT],
+) -> char {
+    let dx = (col as isize - player_x as isize).abs();
+    let dy = (row as isize - player_y as isize).abs();
+    let distance = (dx * dx / 2 + dy * dy) as f32;
+
+    if distance < 4.0 {
+        maze[row][col]
+    } else if distance < 49.0 {
+        FOG_NEAR
+    } else if distance < 81.0 {
+        FOG_MID
+    } else if distance < 100.0 {
+        FOG_FAR
+    } else {
+        UNEXPLORED_CHAR
     }
 }
 
@@ -144,31 +179,33 @@ fn draw_player_stats(game_state: &GameState) {
         game_state.player.sword_level,
         game_state.level
     );
+    setcolor!(
+        mold_os::vga_buffer::Color::Cyan,
+        mold_os::vga_buffer::Color::Black
+    );
     write_text_at(MAZE_HEIGHT, 0, &stats);
-}
-
-fn is_within_view(row: usize, col: usize, player_x: usize, player_y: usize) -> bool {
-    let dx = (col as isize - player_x as isize).abs();
-    let dy = (row as isize - player_y as isize).abs();
-    dx <= 2 && dy <= 2
+    setcolor!(
+        mold_os::vga_buffer::Color::White,
+        mold_os::vga_buffer::Color::Black
+    );
 }
 
 fn handle_player_input(game_state: &mut GameState) {
     let input = get_char();
 
-    let (new_x, new_y) = match input {
+    match input {
+        'w' | 's' | 'a' | 'd' => move_player(game_state, input),
+        'i' => inspect_surroundings(game_state),
+        _ => {}
+    }
+}
+
+fn move_player(game_state: &mut GameState, direction: char) {
+    let (new_x, new_y) = match direction {
         'w' => (game_state.player.x, game_state.player.y.saturating_sub(1)),
         's' => (game_state.player.x, game_state.player.y + 1),
         'a' => (game_state.player.x.saturating_sub(1), game_state.player.y),
         'd' => (game_state.player.x + 1, game_state.player.y),
-        ' ' => {
-            if let Some(entity) =
-                get_entity_at(game_state, game_state.player.x, game_state.player.y)
-            {
-                handle_interaction(game_state, entity);
-            }
-            (game_state.player.x, game_state.player.y)
-        }
         _ => (game_state.player.x, game_state.player.y),
     };
 
@@ -176,6 +213,99 @@ fn handle_player_input(game_state: &mut GameState) {
         game_state.player.x = new_x;
         game_state.player.y = new_y;
         reveal_area(game_state, new_x, new_y);
+
+        if let Some(entity) = get_entity_at(game_state, new_x, new_y) {
+            handle_interaction(game_state, entity);
+        }
+    }
+}
+
+fn inspect_surroundings(game_state: &GameState) {
+    let mut info = String::new();
+
+    for dy in -1..=1 {
+        for dx in -1..=1 {
+            let x = game_state.player.x as isize + dx;
+            let y = game_state.player.y as isize + dy;
+
+            if x >= 0 && x < MAZE_WIDTH as isize && y >= 0 && y < MAZE_HEIGHT as isize {
+                let entity = game_state.maze[y as usize][x as usize];
+                match entity {
+                    CHEST_CHAR => info.push_str("You see a chest nearby. "),
+                    MONSTER_CHAR => info.push_str("A monster lurks in the shadows. "),
+                    EXIT_CHAR => info.push_str("You spot the exit! "),
+                    WALL_CHAR => info.push_str("There's a wall. "),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    if info.is_empty() {
+        info = "There's nothing interesting nearby.".to_string();
+    }
+
+    display_info_box(&info);
+}
+
+fn display_info_box(info: &str) {
+    clrscr!();
+    write_text_at(11, 6, info);
+    write_text_at(18, 30, "Press any key to continue...");
+    get_char();
+}
+
+fn exit_menu(game_state: &mut GameState) {
+    loop {
+        display_info_box("You found the exit! 1. Proceed to next level 2. Stay on current level");
+        match get_char() {
+            '1' => {
+                next_level(game_state);
+                break;
+            }
+            '2' => break,
+            _ => {}
+        }
+    }
+}
+
+fn handle_interaction(game_state: &mut GameState, entity: char) {
+    match entity {
+        CHEST_CHAR => chest_menu(game_state),
+        MONSTER_CHAR => monster_menu(game_state),
+        EXIT_CHAR => exit_menu(game_state),
+        _ => {}
+    }
+}
+
+fn chest_menu(game_state: &mut GameState) {
+    loop {
+        display_info_box("You found a chest! 1. Open 2. Leave");
+        match get_char() {
+            '1' => {
+                open_chest(game_state);
+                break;
+            }
+            '2' => break,
+            _ => {}
+        }
+    }
+}
+
+fn monster_menu(game_state: &mut GameState) {
+    loop {
+        display_info_box("You encountered a monster! What do you want to do?\n1. Fight\n2. Flee");
+        match get_char() {
+            '1' => {
+                fight_monster(game_state);
+                break;
+            }
+            '2' => {
+                flee_from_monster(game_state);
+                break;
+            }
+            _ => {}
+        }
     }
 }
 
@@ -188,12 +318,25 @@ fn get_entity_at(game_state: &GameState, x: usize, y: usize) -> Option<char> {
     }
 }
 
-fn handle_interaction(game_state: &mut GameState, entity: char) {
-    match entity {
-        CHEST_CHAR => open_chest(game_state),
-        MONSTER_CHAR => fight_monster(game_state),
-        EXIT_CHAR => next_level(game_state),
-        _ => {}
+fn flee_from_monster(game_state: &mut GameState) {
+    let mut rng = Rng::new(game_state.level as u32);
+    if rng.next_range(100) < 70 {
+        display_info_box("You successfully fled from the monster!");
+        // Move player to a random adjacent empty cell
+        let directions = [(0, -1), (0, 1), (-1, 0), (1, 0)];
+        for _ in 0..4 {
+            let (dx, dy) = directions[rng.next_range(4) as usize];
+            let new_x = (game_state.player.x as isize + dx) as usize;
+            let new_y = (game_state.player.y as isize + dy) as usize;
+            if game_state.maze[new_y][new_x] == EXPLORED_CHAR {
+                game_state.player.x = new_x;
+                game_state.player.y = new_y;
+                break;
+            }
+        }
+    } else {
+        display_info_box("You failed to flee! The monster attacks you.");
+        game_state.player.health -= game_state.level as i32 * 5;
     }
 }
 
@@ -310,5 +453,3 @@ pub fn start(boot_info: &'static BootInfo) {
 pub fn end() {
     println!("Thanks for playing Mold OS Maze Game!");
 }
-
-
