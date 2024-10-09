@@ -131,7 +131,6 @@ pub fn clear_screen() {
     });
 }
 
-
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -342,7 +341,6 @@ impl Writer {
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::serial_print;
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
