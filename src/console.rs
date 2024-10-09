@@ -18,7 +18,7 @@ fn get_from_stdin_with_delimiters(delimiters: &[char]) -> String {
                 // wait
             }
             // Lock the buffer
-            if *BUFFER.lock() != '\0'  {
+            if *BUFFER.lock() != '\0' {
                 let buffer = BUFFER.lock();
                 print!("{}", *buffer);
                 buffer_content = *buffer;
@@ -33,7 +33,7 @@ fn get_from_stdin_with_delimiters(delimiters: &[char]) -> String {
                 // Remove the last character from output string
                 output.pop();
             }
-            continue;  // Continue to the next iteration without processing further
+            continue; // Continue to the next iteration without processing further
         }
 
         // Break the loop if the buffer content matches any delimiter
@@ -60,4 +60,27 @@ pub fn get_word() -> String {
 /// Retrieves an entire line from the BUFFER until a newline is encountered
 pub fn get_line() -> String {
     get_from_stdin_with_delimiters(&['\n'])
+}
+
+/// Retrieves a single character from the BUFFER
+pub fn get_char() -> char {
+    loop {
+        let buffer_content;
+        {
+            while BUFFER.is_locked() {
+                // wait
+            }
+            // Lock the buffer
+            if *BUFFER.lock() != '\0' {
+                let buffer = BUFFER.lock();
+                buffer_content = *buffer;
+            } else {
+                continue;
+            }
+            clear_buffer();
+        } // Unlock buffer
+
+        // Return the first character available
+        return buffer_content;
+    }
 }
