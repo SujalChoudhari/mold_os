@@ -4,7 +4,9 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 #![feature(abi_x86_interrupt)]
+extern crate alloc;
 
+use alloc::boxed::Box;
 use core::panic::PanicInfo;
 pub mod gdt;
 pub mod interrupts;
@@ -13,6 +15,8 @@ pub mod vga_buffer;
 pub mod console;
 pub mod string;
 pub mod memory;
+pub mod allocator;
+
 pub trait Testable {
     fn run(&self) -> ();
 }
